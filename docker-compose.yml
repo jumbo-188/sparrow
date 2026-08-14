@@ -8,7 +8,7 @@ services:
     restart: always
     # 映射端口（宿主机8000 -> 容器8000）
     ports:
-      - "8000:8000"
+      - "5080:8000"
     # 挂载配置文件和日志（持久化存储）
     volumes:
       - ./config:/app/config      # 配置文件存放处
