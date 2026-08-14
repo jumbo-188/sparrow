@@ -1,0 +1,54 @@
+channels:
+  - name: pushplus
+    type: webhook
+    url: https://www.pushplus.plus/batchSend
+    method: POST
+    headers:
+      Content-Type: application/json
+    payload_template: |
+      {
+        "token": "${PUSHPLUS_TOKEN}",
+        "title": "{{ title | default('Sparrow通知') }}",
+        "content": "{{ message }}",
+        "template": "markdown"
+      }
+
+  - name: bark
+    type: webhook
+    # 注意：这里的 URL 会在 sender 里自动拼接 KEY，或者你直接写完整 URL 也可以
+    url: https://api.day.app/${BARK_KEY}
+    method: GET
+
+messages:
+  # 规则1：每日清晨问候（8:00）
+  - id: morning_greeting
+    description: "早安问候"
+    schedule: "0 8 * * *"            # 每天8点（北京时间，已在容器内配置时区）
+    channel: pushplus
+    default_data:
+      title: "🌅 早安"
+    template: |
+      ## 早上好！
+      今天是 {{ date }}
+      今天也要元气满满哦 💪
+
+  # 规则2：每日晚间复盘（22:00）
+  - id: evening_summary
+    description: "晚间复盘"
+    schedule: "0 22 * * *"
+    channel: bark
+    default_data:
+      title: "📝 今日总结"
+    template: "{{ title }}\n今天辛苦了，早点休息。明天继续加油！"
+
+  # 规则3：每周一早上9点周报
+  - id: weekly_push
+    description: "每周周报"
+    schedule: "0 9 * * 1"           # 每周一 9点
+    channel: pushplus
+    default_data:
+      title: "📊 周报"
+    template: |
+      ## 本周周报
+      请记得填写本周工作总结！
+      > 截止日期: 今日 18:00

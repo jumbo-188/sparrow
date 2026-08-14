@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  sparrow:
+    build: .
+    container_name: sparrow-push
+    # 重要：NAS重启或Docker崩溃后自动拉起
+    restart: always
+    # 映射端口（宿主机8000 -> 容器8000）
+    ports:
+      - "8000:8000"
+    # 挂载配置文件和日志（持久化存储）
+    volumes:
+      - ./config:/app/config      # 配置文件存放处
+      - ./logs:/app/logs          # 日志存放处
+      - /etc/localtime:/etc/localtime:ro  # 强制容器时间与NAS一致
+    # 环境变量（从 .env 读取 Token）
+    env_file:
+      - .env
+    # 可选：如果你不想用 env_file，也可以直接写环境变量
+    environment:
+      - TZ=Asia/Shanghai
