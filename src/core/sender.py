@@ -1,65 +1,66 @@
 import httpx
 import json
-from jinja2 import Template
 import logging
+from jinja2 import Template, Environment, StrictUndefined
 
 logger = logging.getLogger(__name__)
 
 
 async def send_push(channel_config, template_str, data):
-    """执行单条推送"""
+    """
+    推送执行器：统一使用 POST + JSON 请求体
+    所有消息字段（包括 Bark 的 group/icon）都在 payload_template 中定义
+    """
     try:
-        # 1. 渲染消息内容
-        tmpl = Template(template_str)
-        rendered_message = tmpl.render(**data)
+        # 1. 渲染消息主体（用户看到的文字内容）
+        msg_tmpl = Template(template_str)
+        rendered_message = msg_tmpl.render(**data)
 
-        # 2. 构建请求
+        # 2. 获取渠道配置
         url = channel_config['url']
-        method = channel_config.get('method', 'POST').upper()
+        method = channel_config.get('method', 'POST').upper()  # 强制 POST
         headers = channel_config.get('headers', {})
-        payload = {}
 
-        # 3. 处理 Payload 模板（如果有）
+        # 3. 构建最终请求体（核心：支持 group, icon 等所有 Bark 专属字段）
+        payload = {}
         if channel_config.get('payload_template'):
-            pt = Template(channel_config['payload_template'])
-            rendered_payload = pt.render(**data, message=rendered_message)
+            # 使用 Jinja2 渲染 payload（允许未定义变量时使用默认值）
+            env = Environment(undefined=StrictUndefined)
+            pt = env.from_string(channel_config['payload_template'])
+
+            # 渲染时传入完整数据，并附加上渲染好的消息主体
+            # 这样你在模板里既可以用 {{ message }} 也可以用 {{ group }}
+            rendered_payload_str = pt.render(**data, message=rendered_message)
+
+            # 尝试解析为 JSON
             try:
-                payload = json.loads(rendered_payload)
-            except:
-                # 如果不是 JSON，则作为普通文本处理（Bark 走 URL 参数）
-                if method == "GET":
-                    # Bark 特殊处理：拼接 URL 参数
-                    # 假设 url 为 https://api.day.app/${BARK_KEY}
-                    # 格式化为 https://api.day.app/KEY/标题/内容
-                    title = data.get('title', '通知')
-                    # 简单处理：直接拼接在末尾？但最好在 config 中用 url_template
-                    # 我们保留灵活性，如果 url 有 ? 则用 params，否则走 data
-                    pass
+                payload = json.loads(rendered_payload_str)
+            except json.JSONDecodeError as e:
+                logger.error(f"Payload 不是合法 JSON: {rendered_payload_str}, 错误: {e}")
+                # 降级处理：如果解析失败，就把渲染结果作为纯文本放在 body 字段
+                payload = {"body": rendered_payload_str}
         else:
-            # 如果没有 payload_template，默认传 message 字段
+            # 如果没有配置模板，默认发包
             payload = {"message": rendered_message}
 
-        # 4. 发送请求
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            if method == "GET":
-                # 适配 Bark：将消息放在 URL 路径或 Query 中
-                # 规则：如果 url 包含 ?，则当作 query 参数；否则把 message 作为路径最后一段
-                if '?' in url:
-                    resp = await client.get(url, params={"text": rendered_message, **data})
-                else:
-                    # Bark 格式: https://api.day.app/KEY/标题/内容
-                    # 通过 payload_template 拼接实现
-                    resp = await client.get(url)
-            else:
-                # POST JSON
-                if 'application/json' in headers.get('Content-Type', ''):
-                    resp = await client.post(url, json=payload, headers=headers)
-                else:
-                    resp = await client.post(url, data=payload, headers=headers)
+        # 4. 发送 HTTP POST 请求
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            # 强制 POST（忽略配置里的 GET，因为你要统一用 POST）
+            if method.upper() != "POST":
+                logger.warning(f"配置为 {method}，但已强制转为 POST 请求")
 
-            resp.raise_for_status()
-            logger.info(f"推送成功: {channel_config['name']}")
+            # 设置默认 Content-Type 为 JSON
+            if 'Content-Type' not in headers:
+                headers['Content-Type'] = 'application/json'
+
+            # 请求体直接传 JSON
+            response = await client.post(url, json=payload, headers=headers)
+            response.raise_for_status()
+
+            logger.info(f"✅ 推送成功 -> {channel_config['name']} | 状态码: {response.status_code}")
+            logger.debug(f"请求体: {json.dumps(payload, ensure_ascii=False)}")
             return True
+
     except Exception as e:
-        logger.error(f"推送失败: {e}")
+        logger.error(f"❌ 推送失败: {e}")
         return False

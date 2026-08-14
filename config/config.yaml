@@ -1,54 +1,85 @@
+# Sparrow 配置文件 - 统一 POST 方式，支持 Bark 分组与图标
 channels:
+  # ========== PushPlus 渠道（微信推送）==========
   - name: pushplus
     type: webhook
-    url: https://www.pushplus.plus/batchSend
+    url: http://www.pushplus.plus/send
     method: POST
     headers:
       Content-Type: application/json
+    # PushPlus 官方要求：token, title, content
     payload_template: |
       {
         "token": "${PUSHPLUS_TOKEN}",
-        "title": "{{ title | default('Sparrow通知') }}",
+        "title": "{{ title | default('Sparrow 通知') }}",
         "content": "{{ message }}",
         "template": "markdown"
       }
 
+  # ========== Bark 渠道（iOS 推送） - 支持 group 和 icon ==========
   - name: bark
     type: webhook
-    # 注意：这里的 URL 会在 sender 里自动拼接 KEY，或者你直接写完整 URL 也可以
+    # Bark 官方 POST 地址直接使用你的 KEY（标准用法）
     url: https://api.day.app/${BARK_KEY}
-    method: GET
+    method: POST
+    headers:
+      Content-Type: application/json
+    # ✅ 重点：这里可以随心定义 Bark 的全部高级参数
+    payload_template: |
+      {
+        "title": "{{ title | default('Sparrow 通知') }}",
+        "body": "{{ message }}",
+        "group": "{{ group | default('Sparrow') }}",
+        "icon": "{{ icon | default('https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/sparrow.png') }}",
+        "badge": {{ badge | default(1) }},
+        "sound": "{{ sound | default('minuet.caf') }}",
+        "url": "{{ url | default('') }}",
+        "automaticallyCopy": {{ automaticallyCopy | default(0) }}
+      }
+    # 注意：Bark 的 group 用于在通知中心归类，icon 支持传入图片 URL 或 SF Symbols 名称
 
+# ========== 消息规则（每条可独立设置 group/icon）==========
 messages:
-  # 规则1：每日清晨问候（8:00）
+  # 规则1：每日早报（指定 group 为 "Daily"，图标用太阳）
   - id: morning_greeting
-    description: "早安问候"
-    schedule: "0 8 * * *"            # 每天8点（北京时间，已在容器内配置时区）
-    channel: pushplus
+    description: "早安问候（带分组和图标）"
+    schedule: "0 8 * * *"          # 每天 8:00（北京时间）
+    channel: bark                  # 发往 Bark
     default_data:
       title: "🌅 早安"
+      group: "Daily"               # 👈 自定义分组
+      icon: "https://i.imgur.com/sun.png"  # 👈 自定义图标（网络图床链接）
     template: |
-      ## 早上好！
+      早上好！
       今天是 {{ date }}
       今天也要元气满满哦 💪
 
-  # 规则2：每日晚间复盘（22:00）
-  - id: evening_summary
-    description: "晚间复盘"
-    schedule: "0 22 * * *"
+  # 规则2：紧急告警（使用单独的分组 "Alert"，图标用警告色）
+  - id: server_alert
+    description: "服务器紧急告警"
+    schedule: "0 14 * * *"         # 每天 14:00 测试用
     channel: bark
     default_data:
-      title: "📝 今日总结"
-    template: "{{ title }}\n今天辛苦了，早点休息。明天继续加油！"
+      title: "🚨 紧急告警"
+      group: "Alert"               # 👈 特殊分组
+      icon: "https://i.imgur.com/alert.png"
+      sound: "alarm.caf"           # 特殊警报音
+      badge: 5
+    template: |
+      ⚠️ 服务器告警
+      CPU 使用率: {{ cpu }}%
+      内存使用率: {{ memory }}%
+      请立即处理！
 
-  # 规则3：每周一早上9点周报
-  - id: weekly_push
-    description: "每周周报"
-    schedule: "0 9 * * 1"           # 每周一 9点
+  # 规则3：每日总结（走 PushPlus，微信接收）
+  - id: daily_summary
+    description: "每日工作复盘"
+    schedule: "0 22 * * *"
     channel: pushplus
     default_data:
-      title: "📊 周报"
+      title: "📊 今日复盘"
     template: |
-      ## 本周周报
-      请记得填写本周工作总结！
-      > 截止日期: 今日 18:00
+      ## 今日完成
+      - 任务1: 已完成
+      - 任务2: 进行中
+      明天继续加油！
