@@ -1,85 +1,81 @@
-# Sparrow 配置文件 - 统一 POST 方式，支持 Bark 分组与图标
+# Sparrow 配置文件 - 新格式（适配 Phase 1 数据模型）
+
 channels:
-  # ========== PushPlus 渠道（微信推送）==========
+  # ========== PushPlus 渠道 ==========
   - name: pushplus
-    type: webhook
+    type: pushplus
     url: http://www.pushplus.plus/send
     method: POST
     headers:
       Content-Type: application/json
-    # PushPlus 官方要求：token, title, content
-    payload_template: |
-      {
-        "token": "${PUSHPLUS_TOKEN}",
-        "title": "{{ title | default('Sparrow 通知') }}",
-        "content": "{{ message }}",
-        "template": "markdown"
-      }
+    # 全局默认配置（消息规则中可覆盖）
+    default_channel: "wechat"
+    default_template: "markdown"
+    default_topic: ""
 
-  # ========== Bark 渠道（iOS 推送） - 支持 group 和 icon ==========
+  # ========== Bark 渠道 ==========
   - name: bark
-    type: webhook
-    # Bark 官方 POST 地址直接使用你的 KEY（标准用法）
+    type: bark
     url: https://api.day.app/${BARK_KEY}
     method: POST
     headers:
       Content-Type: application/json
-    # ✅ 重点：这里可以随心定义 Bark 的全部高级参数
-    payload_template: |
-      {
-        "title": "{{ title | default('Sparrow 通知') }}",
-        "body": "{{ message }}",
-        "group": "{{ group | default('Sparrow') }}",
-        "icon": "{{ icon | default('https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/sparrow.png') }}",
-        "badge": {{ badge | default(1) }},
-        "sound": "{{ sound | default('minuet.caf') }}",
-        "url": "{{ url | default('') }}",
-        "automaticallyCopy": {{ automaticallyCopy | default(0) }}
-      }
-    # 注意：Bark 的 group 用于在通知中心归类，icon 支持传入图片 URL 或 SF Symbols 名称
+    # 全局默认配置（消息规则中可覆盖）
+    default_group: "Sparrow"
+    default_icon: ""
 
-# ========== 消息规则（每条可独立设置 group/icon）==========
+# ========== 消息规则 ==========
 messages:
-  # 规则1：每日早报（指定 group 为 "Daily"，图标用太阳）
+  # ---- 规则1：早安问候（每天 8:00，发到 Bark） ----
   - id: morning_greeting
-    description: "早安问候（带分组和图标）"
-    schedule: "0 8 * * *"          # 每天 8:00（北京时间）
-    channel: bark                  # 发往 Bark
-    default_data:
+    description: "早安问候"
+    original_schedule: "0 8 * * *"        # 用户期望的推送时间
+    advance_value: 0                      # 提前量（0 表示不提前）
+    advance_unit: "minutes"               # 单位：minutes / hours / days
+    channels:                             # 渠道列表（数组）
+      - bark
+    data:                                 # 模板默认数据
       title: "🌅 早安"
-      group: "Daily"               # 👈 自定义分组
-      icon: "https://i.imgur.com/sun.png"  # 👈 自定义图标（网络图床链接）
+      group: "Daily"
     template: |
       早上好！
       今天是 {{ date }}
       今天也要元气满满哦 💪
+    enabled: true
 
-  # 规则2：紧急告警（使用单独的分组 "Alert"，图标用警告色）
+  # ---- 规则2：服务器告警（每15分钟，发到 Bark） ----
   - id: server_alert
-    description: "服务器紧急告警"
-    schedule: "0 14 * * *"         # 每天 14:00 测试用
-    channel: bark
-    default_data:
-      title: "🚨 紧急告警"
-      group: "Alert"               # 👈 特殊分组
-      icon: "https://i.imgur.com/alert.png"
-      sound: "alarm.caf"           # 特殊警报音
+    description: "服务器告警"
+    original_schedule: "*/15 * * * *"     # 每15分钟（测试用）
+    advance_value: 0
+    advance_unit: "minutes"
+    channels:
+      - bark
+    data:
+      title: "🚨 服务器告警"
+      group: "Alert"
+      icon: "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/alert.png"
+      sound: "alarm.caf"
       badge: 5
     template: |
-      ⚠️ 服务器告警
-      CPU 使用率: {{ cpu }}%
-      内存使用率: {{ memory }}%
+      ⚠️ **服务器告警**
+      CPU: {{ cpu }}%
+      内存: {{ memory }}%
+      磁盘: {{ disk }}%
       请立即处理！
+    enabled: true
 
-  # 规则3：每日总结（走 PushPlus，微信接收）
+  # ---- 规则3：每日总结（每天 22:00，发到 PushPlus） ----
   - id: daily_summary
-    description: "每日工作复盘"
-    schedule: "0 22 * * *"
-    channel: pushplus
-    default_data:
-      title: "📊 今日复盘"
+    description: "每日总结"
+    original_schedule: "0 22 * * *"
+    advance_value: 0
+    advance_unit: "minutes"
+    channels:
+      - pushplus
+    data:
+      title: "📊 每日总结"
     template: |
-      ## 今日完成
-      - 任务1: 已完成
-      - 任务2: 进行中
-      明天继续加油！
+      ## 今日总结
+      今天辛苦了，明天继续加油！
+    enabled: true
