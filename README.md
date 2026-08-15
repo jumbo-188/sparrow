@@ -13,7 +13,7 @@ Sparrow 是一个 **Python + FastAPI + APScheduler** 构建的定时推送中台
 - 🎨 **Bark 高级定制**：支持 `group`（消息分组）、`icon`（自定义图标）、`sound`、`badge` 等全部参数。
 - 🗂️ **全配置化**：所有消息规则、模板、渠道参数都在 `config.yaml` 中声明，无需修改代码。
 - 🔄 **热加载**：提供 `/api/v1/reload` 接口，修改配置后无需重启容器即可生效。
-- 🐳 **NAS 原生适配**：提供 `docker-compose.yml`，一键部署在绿联 NAS（或其他 Docker 环境），开机自启。
+- 🐳 **NAS 原生适配**：提供 `docker-compose.yaml`，一键部署在绿联 NAS（或其他 Docker 环境），开机自启。
 
 ---
 
@@ -43,7 +43,7 @@ sparrow/
 ### 1. 准备文件
 在绿联 NAS 的 Docker 共享目录（例如 `共享文件夹/docker/sparrow/`）下，创建以下文件：
 
-- `docker-compose.yml`
+- `docker-compose.yaml`
 - `Dockerfile`
 - `requirements.txt`
 - `.env`
@@ -146,9 +146,9 @@ curl -X POST http://nas-ip:8000/api/v1/test \
 
 ## 🐳 运维小贴士
 
-- **开机自启**：`docker-compose.yml` 已配置 `restart: always`，NAS 重启后自动运行，无需手动干预。
+- **开机自启**：`docker-compose.yaml` 已配置 `restart: always`，NAS 重启后自动运行，无需手动干预。
 
-- **时区问题**：确保 `.env` 中 `TZ=Asia/Shanghai`，并在 `docker-compose.yml` 中挂载了 `/etc/localtime:/etc/localtime:ro`。如果推送时间仍不对，进入容器执行 `date` 检查。
+- **时区问题**：确保 `.env` 中 `TZ=Asia/Shanghai`，并在 `docker-compose.yaml` 中挂载了 `/etc/localtime:/etc/localtime:ro`。如果推送时间仍不对，进入容器执行 `date` 检查。
 
 - **配置热更新**：修改 `config.yaml` 后，执行 `POST /api/v1/reload`，无需重启容器，调度器会重新加载所有消息规则（新增/修改/删除的任务都会生效）。
 
