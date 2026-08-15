@@ -6,3 +6,5 @@ httpx==0.28.1
 jinja2==3.1.4
 apscheduler==3.10.4
 pytz==2024.1
+croniter==2.0.1             # 👈 用于精准计算 Cron 偏移
+pydantic==2.10.3
