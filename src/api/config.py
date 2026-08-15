@@ -3,26 +3,26 @@
 提供 CRUD 接口供前端调用
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from typing import List, Dict, Any
 
 from src.models import MessageRule, SparrowConfig
 from src.core import config_manager as cm
 from src.utils.cron_helper import calculate_actual_cron, format_schedule_display
-from src.api.auth import AuthDep
+from src.api.auth import verify_password
 
 router = APIRouter(prefix="/api/config", tags=["Config"])
 
 
 # ============ 全量配置 ============
 @router.get("/full")
-async def get_full_config(auth: AuthDep) -> SparrowConfig:
+async def get_full_config(auth: bool = Depends(verify_password)) -> SparrowConfig:
     """获取完整配置"""
     return cm.load_config()
 
 
 @router.post("/reload")
-async def reload_config(auth: AuthDep) -> dict:
+async def reload_config(auth: bool = Depends(verify_password)) -> dict:
     """热加载配置（触发调度器更新）"""
     try:
         config = cm.reload_config()
@@ -34,7 +34,7 @@ async def reload_config(auth: AuthDep) -> dict:
 
 # ============ 消息规则 CRUD ============
 @router.get("/rules")
-async def list_rules(auth: AuthDep) -> List[dict]:
+async def list_rules(auth: bool = Depends(verify_password)) -> List[dict]:
     """获取所有消息规则（附带计算后的实际时间）"""
     rules = cm.get_all_rules()
     result = []
@@ -61,7 +61,7 @@ async def list_rules(auth: AuthDep) -> List[dict]:
 
 
 @router.get("/rules/{rule_id}")
-async def get_rule(rule_id: str, auth: AuthDep) -> dict:
+async def get_rule(rule_id: str, auth: bool = Depends(verify_password)) -> dict:
     """获取单条规则（含计算时间）"""
     rule = cm.get_rule(rule_id)
     if not rule:
@@ -84,7 +84,7 @@ async def get_rule(rule_id: str, auth: AuthDep) -> dict:
 
 
 @router.post("/rules")
-async def create_rule(rule: MessageRule, auth: AuthDep) -> dict:
+async def create_rule(rule: MessageRule, auth: bool = Depends(verify_password)) -> dict:
     """创建新规则"""
     try:
         cm.add_rule(rule)
@@ -96,7 +96,7 @@ async def create_rule(rule: MessageRule, auth: AuthDep) -> dict:
 
 
 @router.put("/rules/{rule_id}")
-async def update_rule(rule_id: str, updates: Dict[str, Any], auth: AuthDep) -> dict:
+async def update_rule(rule_id: str, updates: Dict[str, Any], auth: bool = Depends(verify_password)) -> dict:
     """更新规则（部分更新）"""
     try:
         # 过滤掉不可更新的字段（如 id 本身）
@@ -111,7 +111,7 @@ async def update_rule(rule_id: str, updates: Dict[str, Any], auth: AuthDep) -> d
 
 
 @router.delete("/rules/{rule_id}")
-async def delete_rule(rule_id: str, auth: AuthDep) -> dict:
+async def delete_rule(rule_id: str, auth: bool = Depends(verify_password)) -> dict:
     """删除规则"""
     success = cm.delete_rule(rule_id)
     if not success:
@@ -121,14 +121,14 @@ async def delete_rule(rule_id: str, auth: AuthDep) -> dict:
 
 # ============ 渠道 CRUD ============
 @router.get("/channels")
-async def list_channels(auth: AuthDep) -> List[dict]:
+async def list_channels(auth: bool = Depends(verify_password)) -> List[dict]:
     """获取所有渠道配置"""
     channels = cm.get_all_channels()
     return [ch.model_dump() for ch in channels]
 
 
 @router.put("/channels/{channel_name}")
-async def update_channel(channel_name: str, updates: Dict[str, Any], auth: AuthDep) -> dict:
+async def update_channel(channel_name: str, updates: Dict[str, Any], auth: bool = Depends(verify_password)) -> dict:
     """更新渠道配置"""
     try:
         updated = cm.update_channel(channel_name, updates)
