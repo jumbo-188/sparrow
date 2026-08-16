@@ -1,5 +1,6 @@
 """
 配置管理 API（无鉴权版）
+包含完整的 CRUD 路由：GET、POST、PUT、DELETE
 """
 
 from fastapi import APIRouter, HTTPException
@@ -30,6 +31,8 @@ async def reload_config() -> dict:
 
 
 # ============ 消息规则 CRUD ============
+
+# ✅ 1. 获取所有规则（列表）
 @router.get("/rules")
 async def list_rules() -> List[dict]:
     """获取所有消息规则（附带计算后的实际时间）"""
@@ -54,6 +57,7 @@ async def list_rules() -> List[dict]:
     return result
 
 
+# ✅ 2. 获取单条规则
 @router.get("/rules/{rule_id}")
 async def get_rule(rule_id: str) -> dict:
     rule = cm.get_rule(rule_id)
@@ -75,6 +79,7 @@ async def get_rule(rule_id: str) -> dict:
     return item
 
 
+# ✅ 3. 创建新规则（POST）
 @router.post("/rules")
 async def create_rule(rule: MessageRule) -> dict:
     try:
@@ -86,11 +91,20 @@ async def create_rule(rule: MessageRule) -> dict:
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ✅ 4. 更新规则（PUT）—— 这就是你缺失的路由！
 @router.put("/rules/{rule_id}")
 async def update_rule(rule_id: str, updates: Dict[str, Any]) -> dict:
+    """
+    更新规则（部分更新）
+    前端提交的 updates 应包含所有字段，但只更新传入的字段
+    """
     try:
+        # 过滤掉不可更新的字段
         if "id" in updates:
             del updates["id"]
+        if "display" in updates:
+            del updates["display"]  # 前端计算字段，不应提交到后端
+
         updated = cm.update_rule(rule_id, updates)
         return {"code": 0, "msg": "规则更新成功", "data": updated.model_dump()}
     except ValueError as e:
@@ -99,6 +113,7 @@ async def update_rule(rule_id: str, updates: Dict[str, Any]) -> dict:
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ✅ 5. 删除规则（DELETE）
 @router.delete("/rules/{rule_id}")
 async def delete_rule(rule_id: str) -> dict:
     success = cm.delete_rule(rule_id)
@@ -108,12 +123,15 @@ async def delete_rule(rule_id: str) -> dict:
 
 
 # ============ 渠道 CRUD ============
+
+# ✅ 6. 获取所有渠道
 @router.get("/channels")
 async def list_channels() -> List[dict]:
     channels = cm.get_all_channels()
     return [ch.model_dump() for ch in channels]
 
 
+# ✅ 7. 更新渠道
 @router.put("/channels/{channel_name}")
 async def update_channel(channel_name: str, updates: Dict[str, Any]) -> dict:
     try:

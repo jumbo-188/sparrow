@@ -113,7 +113,6 @@ const form = reactive({
 
 const dataJson = ref('{}')
 
-// 同步数据
 watch(() => props.show, (val) => {
   visible.value = val
   if (val && props.rule) {
@@ -149,7 +148,6 @@ const resetForm = () => {
 }
 
 const preview = () => {
-  // 模拟数据
   const mockData = {
     date: '2026-08-16',
     time: '14:30:00',
@@ -159,12 +157,10 @@ const preview = () => {
     ...form.data
   }
   try {
-    // 简单模板替换（模拟 Jinja2）
     let text = form.template
     Object.entries(mockData).forEach(([k, v]) => {
       text = text.replace(new RegExp(`{{ ${k} }}`, 'g'), v)
     })
-    // 处理条件/循环较复杂，仅做简单展示
     previewText.value = text
   } catch {
     previewText.value = '模板渲染错误'
@@ -174,12 +170,23 @@ const preview = () => {
 const save = async () => {
   saving.value = true
   try {
-    // 解析 dataJson
     try {
       form.data = JSON.parse(dataJson.value)
     } catch {}
 
-    const payload = { ...form }
+    // ✅ 只提取后端需要的字段，不包含 display 等前端计算字段
+    const payload = {
+      id: form.id,
+      description: form.description,
+      original_schedule: form.original_schedule,
+      advance_value: form.advance_value,
+      advance_unit: form.advance_unit,
+      channels: form.channels,
+      data: form.data,
+      template: form.template,
+      enabled: form.enabled
+    }
+
     if (props.rule) {
       await store.updateRule(props.rule.id, payload)
     } else {
@@ -193,7 +200,6 @@ const save = async () => {
   }
 }
 
-// 监听渠道列表加载
 onMounted(() => {
   if (store.channels.length === 0) {
     store.fetchChannels()

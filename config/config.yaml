@@ -1,81 +1,73 @@
-# Sparrow 配置文件 - 新格式（适配 Phase 1 数据模型）
-
 channels:
-  # ========== PushPlus 渠道 ==========
-  - name: pushplus
-    type: pushplus
-    url: http://www.pushplus.plus/send
-    method: POST
-    headers:
-      Content-Type: application/json
-    # 全局默认配置（消息规则中可覆盖）
-    default_channel: "wechat"
-    default_template: "markdown"
-    default_topic: ""
-
-  # ========== Bark 渠道 ==========
-  - name: bark
-    type: bark
-    url: https://api.day.app/${BARK_KEY}
-    method: POST
-    headers:
-      Content-Type: application/json
-    # 全局默认配置（消息规则中可覆盖）
-    default_group: "Sparrow"
-    default_icon: ""
-
-# ========== 消息规则 ==========
+- name: pushplus
+  type: pushplus
+  url: http://www.pushplus.plus/send
+  method: POST
+  headers:
+    Content-Type: application/json
+  default_channel: wechat
+  default_template: markdown
+  default_topic: ''
+  default_group: Sparrow
+- name: bark
+  type: bark
+  url: https://api.day.app/tfCMjr9maYwubLkdvtcckU
+  method: POST
+  headers:
+    Content-Type: application/json
+  default_template: markdown
+  default_group: Sparrow
+  default_icon: ''
 messages:
-  # ---- 规则1：早安问候（每天 8:00，发到 Bark） ----
-  - id: morning_greeting
-    description: "早安问候"
-    original_schedule: "0 8 * * *"        # 用户期望的推送时间
-    advance_value: 0                      # 提前量（0 表示不提前）
-    advance_unit: "minutes"               # 单位：minutes / hours / days
-    channels:                             # 渠道列表（数组）
-      - bark
-    data:                                 # 模板默认数据
-      title: "🌅 早安"
-      group: "Daily"
-    template: |
-      早上好！
-      今天是 {{ date }}
-      今天也要元气满满哦 💪
-    enabled: true
+- id: morning_greeting
+  description: test
+  original_schedule: 0 8 * * *
+  advance_value: 0
+  advance_unit: minutes
+  channels:
+  - bark
+  data:
+    title: 🌅 早安
+    group: Daily
+  template: '早上好！
 
-  # ---- 规则2：服务器告警（每15分钟，发到 Bark） ----
-  - id: server_alert
-    description: "服务器告警"
-    original_schedule: "*/15 * * * *"     # 每15分钟（测试用）
-    advance_value: 0
-    advance_unit: "minutes"
-    channels:
-      - bark
-    data:
-      title: "🚨 服务器告警"
-      group: "Alert"
-      icon: "https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/alert.png"
-      sound: "alarm.caf"
-      badge: 5
-    template: |
-      ⚠️ **服务器告警**
-      CPU: {{ cpu }}%
-      内存: {{ memory }}%
-      磁盘: {{ disk }}%
-      请立即处理！
-    enabled: true
+    今天是 {{ date }}
 
-  # ---- 规则3：每日总结（每天 22:00，发到 PushPlus） ----
-  - id: daily_summary
-    description: "每日总结"
-    original_schedule: "0 22 * * *"
-    advance_value: 0
-    advance_unit: "minutes"
-    channels:
-      - pushplus
-    data:
-      title: "📊 每日总结"
-    template: |
-      ## 今日总结
-      今天辛苦了，明天继续加油！
-    enabled: true
+    今天也要元气满满哦 💪
+
+
+    哈哈
+
+    '
+  enabled: true
+- id: daily_summary
+  description: 每日总结
+  original_schedule: 0 22 * * *
+  advance_value: 0
+  advance_unit: minutes
+  channels:
+  - pushplus
+  data:
+    title: 📊 每日总结
+  template: '## 今日总结
+
+    今天辛苦了，明天继续加油！
+
+    '
+  enabled: true
+- id: icbc_1
+  description: 工商爱购体育
+  original_schedule: 0 15 * * *
+  advance_value: 5
+  advance_unit: minutes
+  channels:
+  - bark
+  data:
+    title: 工商爱购体育抽奖
+    group: icbc
+    badge: 5
+  template: '## 今日总结
+
+    工商爱购'
+  enabled: true
+  actual_schedule: '*/15 * * * *'
