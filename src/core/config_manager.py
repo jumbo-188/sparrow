@@ -7,10 +7,8 @@ import os
 import yaml
 import shutil
 from typing import List, Dict, Any, Optional
-from datetime import datetime
 
 from src.models import SparrowConfig, MessageRule, ChannelConfig
-# 导入原始的环境变量加载器
 from src.utils.config_loader import load_config as load_raw_config
 
 CONFIG_PATH = "config/config.yaml"
@@ -18,14 +16,8 @@ BACKUP_PATH = "config/config.yaml.bak"
 
 
 def load_config() -> SparrowConfig:
-    """
-    加载并校验配置文件
-    自动替换 ${ENV_VAR} 环境变量
-    """
-    # 1. 使用原有的 config_loader 加载并替换环境变量
+    """加载并校验配置文件，自动替换 ${ENV_VAR} 环境变量"""
     raw_data = load_raw_config(CONFIG_PATH)
-
-    # 2. 使用 Pydantic 校验结构
     return SparrowConfig(**raw_data)
 
 
@@ -34,7 +26,6 @@ def save_config(config: SparrowConfig) -> None:
     if os.path.exists(CONFIG_PATH):
         shutil.copy2(CONFIG_PATH, BACKUP_PATH)
 
-    # 直接 dump 整个对象
     data = config.model_dump(exclude_none=True)
     with open(CONFIG_PATH, 'w', encoding='utf-8') as f:
         yaml.dump(
@@ -74,22 +65,18 @@ def add_rule(rule: MessageRule) -> None:
     save_config(config)
 
 
-# ✅ 修复后的 update_rule
 def update_rule(rule_id: str, rule_update: Dict[str, Any]) -> MessageRule:
     config = load_config()
     found = False
     for idx, rule in enumerate(config.messages):
         if rule.id == rule_id:
-            # 1. 获取现有规则的完整数据
             current_data = rule.model_dump()
-            # 2. 用前端传来的部分更新覆盖
             current_data.update(rule_update)
-            # 3. ✅ 确保 id 存在（从 URL 路径中获取）
+            # 确保 id 存在（从 URL 路径中获取）
             current_data["id"] = rule_id
-            # 4. 移除前端可能传来的 display 字段（前端计算字段，不应存入）
+            # 移除前端可能传来的 display 字段
             if "display" in current_data:
                 del current_data["display"]
-            # 5. 用完整数据构造新的 MessageRule 对象
             updated_rule = MessageRule(**current_data)
             config.messages[idx] = updated_rule
             found = True

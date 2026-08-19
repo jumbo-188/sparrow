@@ -1,73 +1,51 @@
+# Sparrow 配置文件
+
 channels:
-- name: pushplus
-  type: pushplus
-  url: http://www.pushplus.plus/send
-  method: POST
-  headers:
-    Content-Type: application/json
-  default_channel: wechat
-  default_template: markdown
-  default_topic: ''
-  default_group: Sparrow
-- name: bark
-  type: bark
-  url: https://api.day.app/tfCMjr9maYwubLkdvtcckU
-  method: POST
-  headers:
-    Content-Type: application/json
-  default_template: markdown
-  default_group: Sparrow
-  default_icon: ''
+  # ========== PushPlus 渠道 ==========
+  - name: pushplus
+    type: pushplus
+    url: http://www.pushplus.plus/send
+    method: POST
+    headers:
+      Content-Type: application/json
+    default_channel: "wechat"
+    default_template: "markdown"
+    default_topic: ""
+
+  # ========== Bark 渠道 ==========
+  - name: bark
+    type: bark
+    url: https://api.day.app/${BARK_KEY}
+    method: POST
+    headers:
+      Content-Type: application/json
+    default_group: "Sparrow"
+    default_icon: ""
+
+# ========== 消息规则 ==========
 messages:
-- id: morning_greeting
-  description: test
-  original_schedule: 0 8 * * *
-  advance_value: 0
-  advance_unit: minutes
-  channels:
-  - bark
-  data:
-    title: 🌅 早安
-    group: Daily
-  template: '早上好！
+  - id: morning_greeting
+    description: "早安问候"
+    original_schedule: "0 8 * * *"
+    channels:
+      - bark
+    data:
+      title: "🌅 早安"
+      group: "Daily"
+    template: |
+      早上好！
+      今天是 {{ date }}
+      今天也要元气满满哦 💪
+    enabled: true
 
-    今天是 {{ date }}
-
-    今天也要元气满满哦 💪
-
-
-    哈哈
-
-    '
-  enabled: true
-- id: daily_summary
-  description: 每日总结
-  original_schedule: 0 22 * * *
-  advance_value: 0
-  advance_unit: minutes
-  channels:
-  - pushplus
-  data:
-    title: 📊 每日总结
-  template: '## 今日总结
-
-    今天辛苦了，明天继续加油！
-
-    '
-  enabled: true
-- id: icbc_1
-  description: 工商爱购体育
-  original_schedule: 0 15 * * *
-  advance_value: 5
-  advance_unit: minutes
-  channels:
-  - bark
-  data:
-    title: 工商爱购体育抽奖
-    group: icbc
-    badge: 5
-  template: '## 今日总结
-
-    工商爱购'
-  enabled: true
-  actual_schedule: '*/15 * * * *'
+  - id: daily_summary
+    description: "每日总结"
+    original_schedule: "0 22 * * *"
+    channels:
+      - pushplus
+    data:
+      title: "📊 每日总结"
+    template: |
+      ## 今日总结
+      今天辛苦了，明天继续加油！
+    enabled: true

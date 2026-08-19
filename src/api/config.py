@@ -8,7 +8,6 @@ from typing import List, Dict, Any
 
 from src.models import MessageRule, SparrowConfig
 from src.core import config_manager as cm
-from src.utils.cron_helper import calculate_actual_cron, format_schedule_display
 
 router = APIRouter(prefix="/api/config", tags=["Config"])
 
@@ -25,65 +24,58 @@ async def reload_config() -> dict:
     """热加载配置"""
     try:
         config = cm.reload_config()
-        return {"code": 0, "msg": "配置已重新加载", "data": config.model_dump()}
+        # 触发调度器重载
+        from src.core.scheduler import init_scheduler
+        init_scheduler()
+        return {"code": 0, "msg": "配置已重新加载，调度器已更新", "data": config.model_dump()}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 # ============ 消息规则 CRUD ============
 
-# ✅ 1. 获取所有规则（列表）
 @router.get("/rules")
 async def list_rules() -> List[dict]:
-    """获取所有消息规则（附带计算后的实际时间）"""
+    """获取所有消息规则"""
     rules = cm.get_all_rules()
     result = []
     for rule in rules:
         item = rule.model_dump()
-        actual_cron = calculate_actual_cron(
-            rule.original_schedule,
-            rule.advance_value,
-            rule.advance_unit
-        )
-        item["actual_schedule"] = actual_cron
-        display = format_schedule_display(
-            rule.original_schedule,
-            actual_cron,
-            rule.advance_value,
-            rule.advance_unit
-        )
-        item["display"] = display
+        # 直接使用 original_schedule 作为实际执行时间
+        item["actual_schedule"] = rule.original_schedule
+        item["display"] = {
+            "original_display": rule.original_schedule,
+            "actual_display": rule.original_schedule,
+            "original_raw": rule.original_schedule,
+            "actual_raw": rule.original_schedule
+        }
         result.append(item)
     return result
 
 
-# ✅ 2. 获取单条规则
 @router.get("/rules/{rule_id}")
 async def get_rule(rule_id: str) -> dict:
     rule = cm.get_rule(rule_id)
     if not rule:
         raise HTTPException(status_code=404, detail="规则不存在")
     item = rule.model_dump()
-    actual_cron = calculate_actual_cron(
-        rule.original_schedule,
-        rule.advance_value,
-        rule.advance_unit
-    )
-    item["actual_schedule"] = actual_cron
-    item["display"] = format_schedule_display(
-        rule.original_schedule,
-        actual_cron,
-        rule.advance_value,
-        rule.advance_unit
-    )
+    item["actual_schedule"] = rule.original_schedule
+    item["display"] = {
+        "original_display": rule.original_schedule,
+        "actual_display": rule.original_schedule,
+        "original_raw": rule.original_schedule,
+        "actual_raw": rule.original_schedule
+    }
     return item
 
 
-# ✅ 3. 创建新规则（POST）
 @router.post("/rules")
 async def create_rule(rule: MessageRule) -> dict:
     try:
         cm.add_rule(rule)
+        # 创建后重载调度器
+        from src.core.scheduler import init_scheduler
+        init_scheduler()
         return {"code": 0, "msg": "规则创建成功", "data": rule.model_dump()}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -91,21 +83,18 @@ async def create_rule(rule: MessageRule) -> dict:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ✅ 4. 更新规则（PUT）—— 这就是你缺失的路由！
 @router.put("/rules/{rule_id}")
 async def update_rule(rule_id: str, updates: Dict[str, Any]) -> dict:
-    """
-    更新规则（部分更新）
-    前端提交的 updates 应包含所有字段，但只更新传入的字段
-    """
     try:
-        # 过滤掉不可更新的字段
         if "id" in updates:
             del updates["id"]
         if "display" in updates:
-            del updates["display"]  # 前端计算字段，不应提交到后端
+            del updates["display"]
 
         updated = cm.update_rule(rule_id, updates)
+        # 更新后重载调度器
+        from src.core.scheduler import init_scheduler
+        init_scheduler()
         return {"code": 0, "msg": "规则更新成功", "data": updated.model_dump()}
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -113,25 +102,25 @@ async def update_rule(rule_id: str, updates: Dict[str, Any]) -> dict:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ✅ 5. 删除规则（DELETE）
 @router.delete("/rules/{rule_id}")
 async def delete_rule(rule_id: str) -> dict:
     success = cm.delete_rule(rule_id)
     if not success:
         raise HTTPException(status_code=404, detail="规则不存在")
+    # 删除后重载调度器
+    from src.core.scheduler import init_scheduler
+    init_scheduler()
     return {"code": 0, "msg": "规则已删除"}
 
 
 # ============ 渠道 CRUD ============
 
-# ✅ 6. 获取所有渠道
 @router.get("/channels")
 async def list_channels() -> List[dict]:
     channels = cm.get_all_channels()
     return [ch.model_dump() for ch in channels]
 
 
-# ✅ 7. 更新渠道
 @router.put("/channels/{channel_name}")
 async def update_channel(channel_name: str, updates: Dict[str, Any]) -> dict:
     try:

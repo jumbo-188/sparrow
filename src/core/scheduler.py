@@ -1,14 +1,12 @@
 """
 Sparrow 定时调度器
-支持新配置格式：original_schedule + advance
+直接使用 original_schedule 作为执行时间
 """
 
 import logging
-import pytz
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from src.core.sender import send_push
-from src.utils.cron_helper import calculate_actual_cron
 from src.core.config_manager import load_config as load_config_typed
 
 logger = logging.getLogger(__name__)
@@ -18,7 +16,6 @@ scheduler = AsyncIOScheduler(timezone='Asia/Shanghai')
 
 def init_scheduler():
     """初始化调度器，加载所有消息规则"""
-    # 使用 Pydantic 模型加载配置（已自动兼容旧格式）
     config = load_config_typed()
     channels = {ch.name: ch for ch in config.channels}
     messages = config.messages
@@ -34,17 +31,10 @@ def init_scheduler():
             logger.info(f"⏭️ 消息 {msg.id} 已禁用，跳过")
             continue
 
-        # 获取原始 Cron
-        original_cron = msg.original_schedule
-        # 计算实际执行 Cron（考虑提前量）
-        actual_cron = calculate_actual_cron(
-            original_cron,
-            msg.advance_value,
-            msg.advance_unit
-        )
-        logger.debug(f"📅 {msg.id}: 原始 {original_cron} -> 实际 {actual_cron} (提前 {msg.advance_value}{msg.advance_unit})")
+        # 直接使用原始 Cron，无需计算提前量
+        cron_expr = msg.original_schedule
+        logger.debug(f"📅 {msg.id}: 执行时间 {cron_expr}")
 
-        # 遍历渠道
         for ch_name in msg.channels:
             if ch_name not in channels:
                 logger.error(f"❌ 渠道 '{ch_name}' 未定义，跳过任务 {msg.id}")
@@ -53,16 +43,15 @@ def init_scheduler():
             channel_conf = channels[ch_name]
             job_id = f"{msg.id}_{ch_name}"
 
-            # 使用实际 Cron 注册任务
             scheduler.add_job(
                 func=send_job_wrapper,
-                trigger=CronTrigger.from_crontab(actual_cron),
+                trigger=CronTrigger.from_crontab(cron_expr),
                 args=[channel_conf, msg.template, msg.data],
                 id=job_id,
                 replace_existing=True,
                 misfire_grace_time=60
             )
-            logger.info(f"✅ 已注册定时任务: {msg.id} -> {ch_name} | Cron: {actual_cron}")
+            logger.info(f"✅ 已注册定时任务: {msg.id} -> {ch_name} | Cron: {cron_expr}")
 
     if not scheduler.running:
         scheduler.start()

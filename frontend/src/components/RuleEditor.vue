@@ -8,20 +8,10 @@
         <n-input v-model:value="form.description" placeholder="描述消息用途" />
       </n-form-item>
 
-      <n-form-item label="期望时间 (Cron)" path="original_schedule">
+      <n-form-item label="Cron 表达式" path="original_schedule">
         <n-input v-model:value="form.original_schedule" placeholder="如: 0 8 * * * (每天8点)" />
         <div style="font-size: 12px; color: #888; margin-top: 4px;">
           格式: 分 时 日 月 周 (例: 0 8 * * * 每天8点, */15 * * * * 每15分钟)
-        </div>
-      </n-form-item>
-
-      <n-form-item label="提前推送">
-        <div style="display: flex; gap: 8px; width: 100%;">
-          <n-input-number v-model:value="form.advance_value" :min="0" style="width: 100px;" />
-          <n-select v-model:value="form.advance_unit" :options="unitOptions" style="width: 120px;" />
-          <span style="color: #888; font-size: 13px; line-height: 34px;">
-            (实际执行时间将自动提前)
-          </span>
         </div>
       </n-form-item>
 
@@ -89,12 +79,6 @@ const saving = ref(false)
 const previewText = ref('')
 const formRef = ref(null)
 
-const unitOptions = [
-  { label: '分钟', value: 'minutes' },
-  { label: '小时', value: 'hours' },
-  { label: '天', value: 'days' }
-]
-
 const channelOptions = computed(() =>
   store.channels.map(ch => ({ label: ch.name, value: ch.name }))
 )
@@ -103,8 +87,6 @@ const form = reactive({
   id: '',
   description: '',
   original_schedule: '',
-  advance_value: 0,
-  advance_unit: 'minutes',
   channels: [],
   data: {},
   template: '',
@@ -116,7 +98,15 @@ const dataJson = ref('{}')
 watch(() => props.show, (val) => {
   visible.value = val
   if (val && props.rule) {
-    Object.assign(form, props.rule)
+    Object.assign(form, {
+      id: props.rule.id,
+      description: props.rule.description || '',
+      original_schedule: props.rule.original_schedule || '',
+      channels: [...(props.rule.channels || [])],
+      data: { ...(props.rule.data || {}) },
+      template: props.rule.template || '',
+      enabled: props.rule.enabled !== undefined ? props.rule.enabled : true
+    })
     dataJson.value = JSON.stringify(props.rule.data || {}, null, 2)
   } else if (val) {
     resetForm()
@@ -137,8 +127,6 @@ const resetForm = () => {
   form.id = ''
   form.description = ''
   form.original_schedule = '0 8 * * *'
-  form.advance_value = 0
-  form.advance_unit = 'minutes'
   form.channels = []
   form.data = {}
   form.template = '早上好 {{ date }}'
@@ -174,13 +162,10 @@ const save = async () => {
       form.data = JSON.parse(dataJson.value)
     } catch {}
 
-    // ✅ 只提取后端需要的字段，不包含 display 等前端计算字段
     const payload = {
       id: form.id,
       description: form.description,
       original_schedule: form.original_schedule,
-      advance_value: form.advance_value,
-      advance_unit: form.advance_unit,
       channels: form.channels,
       data: form.data,
       template: form.template,

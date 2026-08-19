@@ -1,77 +1,82 @@
 """
 Sparrow 数据模型定义（基于 Pydantic）
-用于强校验 config.yaml 的数据结构
+支持新旧配置格式兼容
 """
 
 from typing import Optional, List, Dict, Any, Literal
-from pydantic import BaseModel, Field, field_validator
-import re
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 # ============ 渠道配置 ============
 class ChannelConfig(BaseModel):
     name: str
-    type: Literal["pushplus", "bark", "webhook"]  # 预留扩展
+    type: Literal["pushplus", "bark", "webhook"] = "webhook"
     url: str
     method: Literal["POST", "GET"] = "POST"
     headers: Optional[Dict[str, str]] = Field(default_factory=dict)
 
-    # PushPlus 专属字段（可覆盖）
-    default_channel: Optional[str] = None  # wechat, mail, sms 等
+    # PushPlus 专属字段
+    default_channel: Optional[str] = None
     default_template: Optional[Literal["markdown", "html", "txt"]] = "markdown"
-    default_topic: Optional[str] = None  # 群组编码
+    default_topic: Optional[str] = None
 
     # Bark 专属字段
     default_group: Optional[str] = "Sparrow"
     default_icon: Optional[str] = None
 
     # 通用
-    token_env: Optional[str] = None  # 对应 .env 中的变量名
+    token_env: Optional[str] = None
 
 
 # ============ 消息规则 ============
-class AdvanceUnit(str):
-    MINUTES = "minutes"
-    HOURS = "hours"
-    DAYS = "days"
-
-
 class MessageRule(BaseModel):
     id: str
     description: Optional[str] = ""
 
-    # 用户期望的时间（Cron 表达式）
-    original_schedule: str  # 如 "0 8 * * *"
+    # 新字段（必填，但允许从旧字段自动转换）
+    original_schedule: Optional[str] = None
+    schedule: Optional[str] = None              # 旧字段名（兼容）
 
-    # 提前推送配置
-    advance_value: int = 0  # 提前量数值
-    advance_unit: Literal["minutes", "hours", "days"] = "minutes"
+    # ❌ 已删除 advance_value 和 advance_unit
 
-    # 渠道列表（支持多渠道）
-    channels: List[str] = Field(min_length=1)  # 对应 channels 中的 name
+    # 新字段（必填，但允许从旧字段自动转换）
+    channels: Optional[List[str]] = None
+    channel: Optional[str] = None               # 旧字段名（兼容）
 
-    # 默认数据（用于模板渲染）
     data: Dict[str, Any] = Field(default_factory=dict)
-
-    # 模板内容（Jinja2）
     template: str
-
-    # 是否启用（软删除，默认启用）
     enabled: bool = True
 
-    # ----- 以下字段由系统自动计算生成，不存储在 YAML 中（运行时填充）-----
-    # 实际执行的 Cron（由 cron_helper 计算）
-    # 在 Pydantic 中忽略该字段，只在 API 响应中附加
+    # 实际执行时间（运行时计算，不存 YAML）
     actual_schedule: Optional[str] = None
 
-    @field_validator('original_schedule')
+    @field_validator('original_schedule', 'schedule')
     @classmethod
-    def validate_cron(cls, v: str) -> str:
-        """简单校验 Cron 格式（5段）"""
+    def validate_cron(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
         parts = v.split()
         if len(parts) != 5:
             raise ValueError('Cron 表达式必须为 5 段（分 时 日 月 周）')
         return v
+
+    @model_validator(mode='after')
+    def handle_legacy_fields(self) -> 'MessageRule':
+        # 1. 处理 original_schedule
+        if not self.original_schedule and self.schedule:
+            self.original_schedule = self.schedule
+
+        # 2. 处理 channels
+        if not self.channels and self.channel:
+            self.channels = [self.channel]
+
+        # 3. 校验必填
+        if not self.original_schedule:
+            raise ValueError(f"消息 '{self.id}' 缺少 schedule 或 original_schedule 字段")
+        if not self.channels:
+            raise ValueError(f"消息 '{self.id}' 缺少 channel 或 channels 字段")
+
+        return self
 
 
 # ============ 完整配置文件 ============

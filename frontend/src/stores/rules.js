@@ -38,6 +38,9 @@ export const useRulesStore = defineStore('rules', {
     async testPush(ruleId, data = {}) {
       const res = await api.post('/push/test', { rule_id: ruleId, data })
       return res.data
+    },
+    async reloadConfig() {
+      await api.post('/config/reload')
     }
   }
 })
