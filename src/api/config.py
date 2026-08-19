@@ -6,7 +6,7 @@
 from fastapi import APIRouter, HTTPException
 from typing import List, Dict, Any
 
-from src.models import MessageRule, SparrowConfig
+from src.models import MessageRule, SparrowConfig, ChannelConfig
 from src.core import config_manager as cm
 
 router = APIRouter(prefix="/api/config", tags=["Config"])
@@ -24,7 +24,6 @@ async def reload_config() -> dict:
     """热加载配置"""
     try:
         config = cm.reload_config()
-        # 触发调度器重载
         from src.core.scheduler import init_scheduler
         init_scheduler()
         return {"code": 0, "msg": "配置已重新加载，调度器已更新", "data": config.model_dump()}
@@ -41,7 +40,6 @@ async def list_rules() -> List[dict]:
     result = []
     for rule in rules:
         item = rule.model_dump()
-        # 直接使用 original_schedule 作为实际执行时间
         item["actual_schedule"] = rule.original_schedule
         item["display"] = {
             "original_display": rule.original_schedule,
@@ -73,7 +71,6 @@ async def get_rule(rule_id: str) -> dict:
 async def create_rule(rule: MessageRule) -> dict:
     try:
         cm.add_rule(rule)
-        # 创建后重载调度器
         from src.core.scheduler import init_scheduler
         init_scheduler()
         return {"code": 0, "msg": "规则创建成功", "data": rule.model_dump()}
@@ -92,7 +89,6 @@ async def update_rule(rule_id: str, updates: Dict[str, Any]) -> dict:
             del updates["display"]
 
         updated = cm.update_rule(rule_id, updates)
-        # 更新后重载调度器
         from src.core.scheduler import init_scheduler
         init_scheduler()
         return {"code": 0, "msg": "规则更新成功", "data": updated.model_dump()}
@@ -107,7 +103,6 @@ async def delete_rule(rule_id: str) -> dict:
     success = cm.delete_rule(rule_id)
     if not success:
         raise HTTPException(status_code=404, detail="规则不存在")
-    # 删除后重载调度器
     from src.core.scheduler import init_scheduler
     init_scheduler()
     return {"code": 0, "msg": "规则已删除"}
@@ -117,16 +112,64 @@ async def delete_rule(rule_id: str) -> dict:
 
 @router.get("/channels")
 async def list_channels() -> List[dict]:
+    """获取所有渠道配置"""
     channels = cm.get_all_channels()
     return [ch.model_dump() for ch in channels]
 
 
+@router.post("/channels")
+async def create_channel(channel: ChannelConfig) -> dict:
+    """新增渠道"""
+    try:
+        config = cm.load_config()
+        if any(ch.name == channel.name for ch in config.channels):
+            raise HTTPException(status_code=400, detail=f"渠道 '{channel.name}' 已存在")
+
+        config.channels.append(channel)
+        cm.save_config(config)
+        return {"code": 0, "msg": "渠道创建成功", "data": channel.model_dump()}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.put("/channels/{channel_name}")
 async def update_channel(channel_name: str, updates: Dict[str, Any]) -> dict:
+    """更新渠道配置"""
     try:
         updated = cm.update_channel(channel_name, updates)
         return {"code": 0, "msg": "渠道更新成功", "data": updated.model_dump()}
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/channels/{channel_name}")
+async def delete_channel(channel_name: str) -> dict:
+    """
+    删除渠道（简化方案：仅删除渠道，不自动清理规则中的引用）
+    删除后请手动编辑相关规则，移除对该渠道的引用
+    """
+    try:
+        config = cm.load_config()
+        original_len = len(config.channels)
+        config.channels = [ch for ch in config.channels if ch.name != channel_name]
+        if len(config.channels) == original_len:
+            raise HTTPException(status_code=404, detail="渠道不存在")
+        cm.save_config(config)
+
+        # 重载调度器（使变更生效）
+        from src.core.scheduler import init_scheduler
+        init_scheduler()
+
+        return {
+            "code": 0,
+            "msg": f"渠道 '{channel_name}' 已删除",
+            "warning": "请手动检查消息规则，移除对该渠道的引用，否则推送会失败"
+        }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

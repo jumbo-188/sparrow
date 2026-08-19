@@ -54,7 +54,14 @@ const showEditor = ref(false)
 const editingRule = ref(null)
 
 const columns = [
-  { title: 'ID', key: 'id', width: 140 },
+  {
+    title: 'ID',
+    key: 'id',
+    width: 140,
+    sortable: true,
+    sorter: (a, b) => a.id.localeCompare(b.id),
+    defaultSortOrder: 'ascend'
+  },
   { title: '描述', key: 'description', width: 150 },
   {
     title: '推送时间',
@@ -112,9 +119,18 @@ const onSaved = () => {
 }
 
 const handleTest = async (row) => {
+  // 1. 获取原标题（从规则的 data 中读取）
+  const originalTitle = row.data?.title || 'Sparrow 通知'
+  // 2. 添加测试前缀
+  const testTitle = `🧪 测试 - ${originalTitle}`
   message.loading('正在发送测试推送...')
   try {
-    const res = await store.testPush(row.id, { title: '🧪 手动测试' })
+    // 3. 传入修改后的标题，同时保留其他数据
+    const res = await store.testPush(row.id, {
+      title: testTitle,
+      // 如果有其他需要保留的数据，可以在这里透传
+      ...row.data
+    })
     const results = Object.entries(res.results)
       .map(([k, v]) => `${k}: ${v.success ? '✅' : '❌'}`)
       .join(' ')

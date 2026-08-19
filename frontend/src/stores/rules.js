@@ -41,6 +41,22 @@ export const useRulesStore = defineStore('rules', {
     },
     async reloadConfig() {
       await api.post('/config/reload')
+    },
+    // ========== 渠道管理方法 ==========
+    async createChannel(data) {
+      const res = await api.post('/config/channels', data)
+      await this.fetchChannels()
+      return res.data
+    },
+    async updateChannel(name, data) {
+      const res = await api.put(`/config/channels/${name}`, data)
+      await this.fetchChannels()
+      return res.data
+    },
+    async deleteChannel(name) {
+      const res = await api.delete(`/config/channels/${name}`)
+      await this.fetchChannels()
+      return res.data
     }
   }
 })

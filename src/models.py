@@ -7,11 +7,20 @@ from typing import Optional, List, Dict, Any, Literal
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
+# ============ Bark 子终端配置（用于 bark_group） ============
+class BarkChildConfig(BaseModel):
+    """Bark 组中的单个子终端配置"""
+    name: str  # 子终端名称（如 "iPhone"）
+    url: str  # 支持 ${ENV_VAR} 占位符
+    default_group: Optional[str] = "Sparrow"
+    default_icon: Optional[str] = None
+
+
 # ============ 渠道配置 ============
 class ChannelConfig(BaseModel):
     name: str
-    type: Literal["pushplus", "bark", "webhook"] = "webhook"
-    url: str
+    type: Literal["pushplus", "bark", "bark_group", "webhook"] = "webhook"
+    url: Optional[str] = None  # bark_group 不需要
     method: Literal["POST", "GET"] = "POST"
     headers: Optional[Dict[str, str]] = Field(default_factory=dict)
 
@@ -24,7 +33,9 @@ class ChannelConfig(BaseModel):
     default_group: Optional[str] = "Sparrow"
     default_icon: Optional[str] = None
 
-    # 通用
+    # 👇 Bark 组子终端列表
+    children: Optional[List[BarkChildConfig]] = None
+
     token_env: Optional[str] = None
 
 
@@ -35,13 +46,11 @@ class MessageRule(BaseModel):
 
     # 新字段（必填，但允许从旧字段自动转换）
     original_schedule: Optional[str] = None
-    schedule: Optional[str] = None              # 旧字段名（兼容）
-
-    # ❌ 已删除 advance_value 和 advance_unit
+    schedule: Optional[str] = None  # 旧字段名（兼容）
 
     # 新字段（必填，但允许从旧字段自动转换）
     channels: Optional[List[str]] = None
-    channel: Optional[str] = None               # 旧字段名（兼容）
+    channel: Optional[str] = None  # 旧字段名（兼容）
 
     data: Dict[str, Any] = Field(default_factory=dict)
     template: str
@@ -83,3 +92,7 @@ class MessageRule(BaseModel):
 class SparrowConfig(BaseModel):
     channels: List[ChannelConfig]
     messages: List[MessageRule]
+
+
+# ============ 解决前向引用 ============
+ChannelConfig.model_rebuild()
