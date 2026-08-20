@@ -5,12 +5,13 @@
 
 import os
 import json
+import re
 import httpx
 import logging
 from jinja2 import Template
-from typing import Dict, Any, List
+from typing import Dict, Any
 
-from src.models import ChannelConfig, BarkChildConfig
+from src.models import ChannelConfig
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +43,6 @@ async def send_push(channel_conf: ChannelConfig, template_str: str, data: Dict[s
 async def _send_bark_group(channel_conf: ChannelConfig, message: str, data: Dict[str, Any]) -> bool:
     """
     Bark 组推送：遍历所有子终端，分别推送
-    返回 True 表示所有子终端都推送成功，否则返回 False
     """
     if not channel_conf.children:
         logger.error(f"❌ Bark 组 '{channel_conf.name}' 没有子终端配置")
@@ -52,7 +52,6 @@ async def _send_bark_group(channel_conf: ChannelConfig, message: str, data: Dict
     total_count = len(channel_conf.children)
 
     for child in channel_conf.children:
-        # 为每个子终端构造一个临时的 ChannelConfig
         child_conf = ChannelConfig(
             name=f"{channel_conf.name}_{child.name}",
             type="bark",
@@ -81,13 +80,10 @@ async def _send_bark_group(channel_conf: ChannelConfig, message: str, data: Dict
         return False
 
 
-# ============ 原有 Bark 适配器（保持不变） ============
+# ============ Bark 适配器 ============
 async def _send_bark(channel_conf: ChannelConfig, message: str, data: Dict[str, Any]) -> bool:
     """Bark 推送 (POST)"""
-    # 替换 URL 中的环境变量
-    import re
     url = channel_conf.url
-    # 支持 ${ENV_VAR} 格式
     pattern = re.compile(r'\$\{([^}]+)\}')
     def replacer(match):
         var_name = match.group(1)
@@ -106,7 +102,6 @@ async def _send_bark(channel_conf: ChannelConfig, message: str, data: Dict[str, 
         "automaticallyCopy": data.get("automaticallyCopy", 0),
     }
 
-    # 清理空值
     if isinstance(payload["badge"], str) and payload["badge"].isdigit():
         payload["badge"] = int(payload["badge"])
     elif not isinstance(payload["badge"], int):
@@ -134,13 +129,67 @@ async def _send_bark(channel_conf: ChannelConfig, message: str, data: Dict[str, 
         return False
 
 
-# ============ PushPlus 适配器（保持不变） ============
+# ============ PushPlus 适配器（已修复） ============
 async def _send_pushplus(channel_conf: ChannelConfig, message: str, data: Dict[str, Any]) -> bool:
-    # ... 保持原有代码不变 ...
-    pass
+    """
+    PushPlus 推送 (POST)
+    支持参数：token, title, content, channel, template, topic
+    """
+    # 1. 从环境变量读取 Token
+    token = os.getenv("PUSHPLUS_TOKEN")
+    if not token:
+        logger.error("❌ PUSHPLUS_TOKEN 未在 .env 中配置")
+        return False
+
+    # 2. 获取 URL
+    url = channel_conf.url or "http://www.pushplus.plus/send"
+
+    # 3. 组装请求体（优先级：data > 渠道默认）
+    channel = data.get("pushplus_channel") or channel_conf.default_channel or "wechat"
+    template = data.get("pushplus_template") or channel_conf.default_template or "markdown"
+    topic = data.get("pushplus_topic") or channel_conf.default_topic or ""
+
+    payload = {
+        "token": token,
+        "title": data.get("title", "Sparrow 通知"),
+        "content": message,
+        "channel": channel,
+        "template": template,
+    }
+
+    if topic:
+        payload["topic"] = topic
+
+    payload = {k: v for k, v in payload.items() if v is not None and v != ""}
+
+    logger.debug(f"PushPlus 请求体: {json.dumps(payload, ensure_ascii=False)}")
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(url, json=payload, headers={"Content-Type": "application/json"})
+            resp.raise_for_status()
+            result = resp.json()
+
+            if result.get("code") == 200:
+                logger.info(f"✅ PushPlus 推送成功: {result.get('msg', '')}")
+                return True
+            else:
+                logger.error(f"❌ PushPlus 返回错误: code={result.get('code')}, msg={result.get('msg', '未知错误')}")
+                logger.error(f"   请求体: {json.dumps(payload, ensure_ascii=False)}")
+                return False
+    except httpx.HTTPStatusError as e:
+        logger.error(f"❌ PushPlus HTTP 错误: {e.response.status_code}")
+        logger.error(f"   响应内容: {e.response.text}")
+        return False
+    except Exception as e:
+        logger.error(f"❌ PushPlus 请求异常: {e}")
+        return False
 
 
-# ============ 通用 Webhook 适配器（保持不变） ============
+# ============ 通用 Webhook 适配器（预留） ============
 async def _send_webhook(channel_conf: ChannelConfig, message: str, data: Dict[str, Any]) -> bool:
-    # ... 保持原有代码不变 ...
-    pass
+    """
+    通用 Webhook 适配器（后续扩展钉钉、飞书等）
+    """
+    logger.warning(f"⚠️ 通用 Webhook 适配器尚未实现，渠道: {channel_conf.name}")
+    return False

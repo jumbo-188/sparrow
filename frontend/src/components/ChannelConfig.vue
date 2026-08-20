@@ -11,6 +11,7 @@
       :loading="store.loading"
       :bordered="true"
       :striped="true"
+      :row-height="50"
     />
 
     <!-- 编辑/新增弹窗 -->
@@ -173,7 +174,8 @@ const columns = [
   {
     title: '名称',
     key: 'name',
-    width: 130,
+    width: 200,
+    align: 'left',
     sortable: true,
     sorter: (a, b) => a.name.localeCompare(b.name),
     defaultSortOrder: 'ascend'
@@ -181,7 +183,8 @@ const columns = [
   {
     title: '类型',
     key: 'type',
-    width: 120,
+    width: 110,
+    align: 'left',
     render(row) {
       if (!row.type || row.type === '') return '子终端'
       const typeMap = { 'bark': 'Bark', 'bark_group': 'Bark组', 'pushplus': 'PushPlus', 'webhook': 'Webhook' }
