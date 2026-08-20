@@ -8,6 +8,7 @@ import os
 # 导入路由
 from src.api import config as config_api
 from src.api import push as push_api
+from src.api import planner as planner_api
 from src.core.scheduler import init_scheduler
 
 load_dotenv()
@@ -25,6 +26,9 @@ app = FastAPI(title="Sparrow Push Service", version="2.0.0")
 app.include_router(config_api.router)
 
 app.include_router(push_api.router)
+
+app.include_router(planner_api.router)
+
 
 # ---------- 静态文件托管（前端界面） ----------
 # 预留：未来将 Vue 构建产物放在 frontend/dist 中

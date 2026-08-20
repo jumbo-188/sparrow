@@ -10,8 +10,11 @@
       <n-tabs type="line" default-value="rules">
         <!-- 规则列表 Tab -->
         <n-tab-pane name="rules" tab="📋 消息规则">
-          <div style="margin-bottom: 16px; display: flex; justify-content: space-between;">
-            <n-button type="primary" @click="openEditor()">+ 新增规则</n-button>
+          <div style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; gap: 8px;">
+              <n-button type="primary" @click="openEditor()">+ 新增规则</n-button>
+              <n-button type="info" @click="openPlanner()">📅 预览推送计划</n-button>
+            </div>
             <n-button @click="refresh" :loading="store.loading">🔄 刷新</n-button>
           </div>
 
@@ -38,12 +41,71 @@
     :rule="editingRule"
     @saved="onSaved"
   />
+
+  <!-- 推送计划预览模态框 -->
+  <n-modal
+    v-model:show="showPlanner"
+    preset="dialog"
+    title="📅 推送计划预览"
+    :style="{ width: '1100px' }"
+  >
+    <template #header>
+      <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+        <span>📅 推送计划预览</span>
+        <n-space>
+          <n-date-picker
+            v-model:value="plannerDate"
+            type="date"
+            size="small"
+            @update:value="fetchPlanner"
+          />
+          <n-button size="small" @click="fetchPlanner">刷新</n-button>
+        </n-space>
+      </div>
+    </template>
+
+    <div v-if="plannerLoading" style="text-align: center; padding: 40px;">
+      <n-spin size="medium" />
+    </div>
+
+    <div v-else-if="plannerData">
+      <div style="margin-bottom: 12px; display: flex; gap: 20px; font-size: 14px; flex-wrap: wrap;">
+        <span>📆 日期：<strong>{{ plannerData.date }}</strong></span>
+        <span>📊 总计：<strong>{{ plannerData.total }}</strong> 条</span>
+        <span v-for="(count, ch) in plannerData.channel_stats" :key="ch">
+          📨 {{ ch }}：<strong>{{ count }}</strong> 条
+        </span>
+      </div>
+
+      <n-data-table
+        :columns="plannerColumns"
+        :data="plannerData.events"
+        :bordered="true"
+        :striped="true"
+        :row-height="40"
+        max-height="500"
+      />
+    </div>
+
+    <template #action>
+      <n-button @click="showPlanner = false">关闭</n-button>
+    </template>
+  </n-modal>
 </template>
 
 <script setup>
 import { ref, onMounted, h } from 'vue'
-import { NButton, NSpace, NTag, useMessage } from 'naive-ui'
+import {
+  NButton,
+  NSpace,
+  NTag,
+  NModal,
+  NDatePicker,
+  NSpin,
+  useMessage
+} from 'naive-ui'
 import { useRulesStore } from '../stores/rules'
+import { previewDailyPlan } from '../api'
 import RuleEditor from '../components/RuleEditor.vue'
 import ChannelConfig from '../components/ChannelConfig.vue'
 
@@ -53,6 +115,90 @@ const store = useRulesStore()
 const showEditor = ref(false)
 const editingRule = ref(null)
 
+// ============ 推送计划预览 ============
+const showPlanner = ref(false)
+const plannerLoading = ref(false)
+const plannerData = ref(null)
+const plannerDate = ref(new Date())
+
+const plannerColumns = [
+  { title: '时间', key: 'time', width: 80, align: 'center' },
+  { title: '规则 ID', key: 'rule_id', width: 120 },
+  { title: '描述', key: 'description', width: 160, ellipsis: true },
+  {
+    title: '渠道',
+    key: 'channels',
+    width: 150,
+    render(row) {
+      return h(NSpace, { size: 4 }, row.channels.map(ch =>
+        h(NTag, { type: 'info', size: 'small' }, ch)
+      ))
+    }
+  },
+  { title: '标题', key: 'title', width: 180, ellipsis: true },
+  { title: 'Cron', key: 'cron', width: 180, ellipsis: true }
+]
+
+const openPlanner = () => {
+  showPlanner.value = true
+  fetchPlanner()
+}
+
+// ✅ 增强版的 fetchPlanner（核心修复）
+const fetchPlanner = async () => {
+  plannerLoading.value = true
+  try {
+    // 1. 安全获取日期值：确保是 Date 对象
+    let dateObj = null
+    if (plannerDate.value) {
+      // 处理 n-date-picker 可能返回的各种类型
+      if (plannerDate.value instanceof Date) {
+        dateObj = plannerDate.value
+      } else if (typeof plannerDate.value === 'number' || typeof plannerDate.value === 'string') {
+        // 如果是时间戳或字符串，尝试转换为 Date
+        const parsed = new Date(plannerDate.value)
+        if (!isNaN(parsed.getTime())) {
+          dateObj = parsed
+        } else {
+          console.warn('[预览计划] 无效日期值:', plannerDate.value)
+        }
+      } else {
+        console.warn('[预览计划] 未知日期类型:', plannerDate.value)
+      }
+    }
+
+    // 2. 如果日期无效，使用当前日期
+    if (!dateObj || isNaN(dateObj.getTime())) {
+      console.warn('[预览计划] 使用当前日期作为备用')
+      dateObj = new Date()
+    }
+
+    // 3. 格式化为 YYYY-MM-DD（本地时区）
+    const year = dateObj.getFullYear()
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0')
+    const day = String(dateObj.getDate()).padStart(2, '0')
+    const dateStr = `${year}-${month}-${day}`
+
+    console.log('[预览计划] 请求日期:', dateStr)
+
+    // 4. 调用 API
+    const data = await previewDailyPlan(dateStr)
+    console.log('[预览计划] API 返回:', data)
+
+    if (data.code === 0) {
+      plannerData.value = data.data
+    } else {
+      message.error(data.msg || '获取计划失败')
+    }
+  } catch (err) {
+    console.error('[预览计划] 错误:', err)
+    message.error('获取计划失败，请查看控制台错误')
+  } finally {
+    plannerLoading.value = false
+  }
+}
+
+// ============ 原有逻辑 ============
 const columns = [
   {
     title: 'ID',
@@ -119,16 +265,12 @@ const onSaved = () => {
 }
 
 const handleTest = async (row) => {
-  // 1. 获取原标题（从规则的 data 中读取）
   const originalTitle = row.data?.title || 'Sparrow 通知'
-  // 2. 添加测试前缀
   const testTitle = `🧪 测试 - ${originalTitle}`
   message.loading('正在发送测试推送...')
   try {
-    // 3. 传入修改后的标题，同时保留其他数据
     const res = await store.testPush(row.id, {
       title: testTitle,
-      // 如果有其他需要保留的数据，可以在这里透传
       ...row.data
     })
     const results = Object.entries(res.results)
