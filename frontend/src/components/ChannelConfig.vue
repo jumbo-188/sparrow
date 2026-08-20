@@ -1,8 +1,9 @@
 <template>
   <div>
-    <div style="margin-bottom: 16px;">
+    <!-- 操作栏：新增按钮在左，刷新按钮在右 -->
+    <div style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
       <n-button type="primary" @click="openEditor()">+ 新增渠道</n-button>
-      <n-button style="margin-left: 8px;" @click="refresh" :loading="store.loading">🔄 刷新</n-button>
+      <n-button @click="refresh" :loading="store.loading">🔄 刷新</n-button>
     </div>
 
     <n-data-table

@@ -10,21 +10,42 @@
       <n-tabs type="line" default-value="rules">
         <!-- 规则列表 Tab -->
         <n-tab-pane name="rules" tab="📋 消息规则">
-          <div style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
-            <div style="display: flex; gap: 8px;">
+          <div style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
               <n-button type="primary" @click="openEditor()">+ 新增规则</n-button>
               <n-button type="info" @click="openPlanner()">📅 预览推送计划</n-button>
+              <n-input
+                v-model:value="searchKeyword"
+                placeholder="🔍 搜索规则 ID 或描述..."
+                clearable
+                style="width: 260px;"
+                size="small"
+              />
+              <n-tag v-if="searchKeyword" type="info" size="small">
+                匹配 {{ filteredRules.length }} 条
+              </n-tag>
             </div>
             <n-button @click="refresh" :loading="store.loading">🔄 刷新</n-button>
           </div>
 
           <n-data-table
             :columns="columns"
-            :data="store.rules"
+            :data="pagedData"
             :loading="store.loading"
             :bordered="true"
             :striped="true"
+            :row-key="row => row.id"
           />
+
+          <div style="display: flex; justify-content: flex-end; margin-top: 16px;">
+            <n-pagination
+              v-model:page="page"
+              v-model:page-size="pageSize"
+              :item-count="filteredRules.length"
+              :page-sizes="[10, 20, 50, 100]"
+              show-size-picker
+            />
+          </div>
         </n-tab-pane>
 
         <!-- 渠道配置 Tab -->
@@ -94,7 +115,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, h } from 'vue'
+import { ref, onMounted, h, computed, watch } from 'vue'
 import {
   NButton,
   NSpace,
@@ -102,6 +123,8 @@ import {
   NModal,
   NDatePicker,
   NSpin,
+  NInput,
+  NPagination,
   useMessage
 } from 'naive-ui'
 import { useRulesStore } from '../stores/rules'
@@ -115,6 +138,35 @@ const store = useRulesStore()
 const showEditor = ref(false)
 const editingRule = ref(null)
 
+// ============ 搜索功能 ============
+const searchKeyword = ref('')
+
+const filteredRules = computed(() => {
+  const keyword = searchKeyword.value.trim().toLowerCase()
+  if (!keyword) {
+    return store.rules
+  }
+  return store.rules.filter(rule => {
+    const idMatch = rule.id?.toLowerCase().includes(keyword) || false
+    const descMatch = rule.description?.toLowerCase().includes(keyword) || false
+    return idMatch || descMatch
+  })
+})
+
+// ============ 分页功能 ============
+const page = ref(1)
+const pageSize = ref(20)
+
+const pagedData = computed(() => {
+  const start = (page.value - 1) * pageSize.value
+  const end = start + pageSize.value
+  return filteredRules.value.slice(start, end)
+})
+
+watch(searchKeyword, () => {
+  page.value = 1
+})
+
 // ============ 推送计划预览 ============
 const showPlanner = ref(false)
 const plannerLoading = ref(false)
@@ -122,9 +174,9 @@ const plannerData = ref(null)
 const plannerDate = ref(new Date())
 
 const plannerColumns = [
-  { title: '时间', key: 'time', width: 80, align: 'center' },
-  { title: '规则 ID', key: 'rule_id', width: 120 },
-  { title: '描述', key: 'description', width: 160, ellipsis: true },
+  { title: '时间', key: 'time', width: 90, align: 'center' },
+  { title: '规则 ID', key: 'rule_id', width: 120, ellipsis: true },
+  { title: '描述', key: 'description', width: 150, ellipsis: true },
   {
     title: '渠道',
     key: 'channels',
@@ -144,18 +196,14 @@ const openPlanner = () => {
   fetchPlanner()
 }
 
-// ✅ 增强版的 fetchPlanner（核心修复）
 const fetchPlanner = async () => {
   plannerLoading.value = true
   try {
-    // 1. 安全获取日期值：确保是 Date 对象
     let dateObj = null
     if (plannerDate.value) {
-      // 处理 n-date-picker 可能返回的各种类型
       if (plannerDate.value instanceof Date) {
         dateObj = plannerDate.value
       } else if (typeof plannerDate.value === 'number' || typeof plannerDate.value === 'string') {
-        // 如果是时间戳或字符串，尝试转换为 Date
         const parsed = new Date(plannerDate.value)
         if (!isNaN(parsed.getTime())) {
           dateObj = parsed
@@ -167,13 +215,11 @@ const fetchPlanner = async () => {
       }
     }
 
-    // 2. 如果日期无效，使用当前日期
     if (!dateObj || isNaN(dateObj.getTime())) {
       console.warn('[预览计划] 使用当前日期作为备用')
       dateObj = new Date()
     }
 
-    // 3. 格式化为 YYYY-MM-DD（本地时区）
     const year = dateObj.getFullYear()
     const month = String(dateObj.getMonth() + 1).padStart(2, '0')
     const day = String(dateObj.getDate()).padStart(2, '0')
@@ -181,7 +227,6 @@ const fetchPlanner = async () => {
 
     console.log('[预览计划] 请求日期:', dateStr)
 
-    // 4. 调用 API
     const data = await previewDailyPlan(dateStr)
     console.log('[预览计划] API 返回:', data)
 
@@ -198,7 +243,7 @@ const fetchPlanner = async () => {
   }
 }
 
-// ============ 原有逻辑 ============
+// ============ 消息规则表格列定义 ============
 const columns = [
   {
     title: 'ID',
@@ -211,14 +256,10 @@ const columns = [
   { title: '描述', key: 'description', width: 150 },
   {
     title: '推送时间',
-    key: 'display',
-    width: 280,
+    key: 'original_schedule',
+    width: 180,
     render(row) {
-      if (!row.display) return '-'
-      return h('div', { style: 'font-size: 13px;' }, [
-        h('div', { style: 'color: #888;' }, `期望: ${row.display.original_display}`),
-        h('div', { style: 'color: #18a058; font-weight: 500;' }, `实际: ${row.display.actual_display}`)
-      ])
+      return row.original_schedule || '-'
     }
   },
   {
