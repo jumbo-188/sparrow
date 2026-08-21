@@ -135,6 +135,31 @@ curl -X POST http://nas-ip:8000/api/v1/test \
   - `30 9 * * 1` → 每周一 9:30
   - `*/15 * * * *` → 每 15 分钟
 
+```markdown
+目标日	数字写法	推荐英文缩写
+周一	0	mon
+周二	1	tue
+周三	2	wed
+周四	3	thu
+周五	4	fri
+周六	5	sat
+周日	6	sun
+📌 示例
+Cron 表达式	含义
+0 8 * * 0	每周一 8:00
+0 9 * * 4	每周五 9:00
+30 7 * * fri	每周五 7:30（推荐，一目了然）
+0 10 * * sat	每周六 10:00
+0 22 * * sun	每周日 22:00
+⚠️ 避坑提醒
+传统 Unix Cron：0 8 * * 0 = 周日 8:00
+
+APScheduler / croniter：0 8 * * 0 = 周一 8:00（完全不同！）
+
+强烈建议：在 Sparrow 的 Cron 表达式中使用英文缩写（如 mon、fri），这样即使未来查看或迁移，也不会产生歧义。😊
+```
+
+
 - **动态数据**：在 `default_data` 中预设变量，或通过 API 调用时传入覆盖。你可以在模板里用 `{{ variable_name }}` 引用它们，也可以使用 Jinja2 过滤器（如 `default`、`urlencode` 等）。
 
 - **日志查看**：容器内日志路径 `/app/logs/sparrow.log`，也可通过 NAS Docker 界面直接查看容器的实时日志。

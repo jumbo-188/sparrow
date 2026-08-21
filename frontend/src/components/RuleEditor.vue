@@ -1,57 +1,65 @@
 <template>
-  <n-modal v-model:show="visible" preset="dialog" title="编辑规则" :style="{ width: '700px' }">
-    <n-form :model="form" label-placement="left" label-width="120px" ref="formRef">
-      <n-form-item label="规则 ID" path="id">
-        <n-input v-model:value="form.id" placeholder="如: morning_greeting" :disabled="!!props.rule" />
-      </n-form-item>
-      <n-form-item label="描述" path="description">
-        <n-input v-model:value="form.description" placeholder="描述消息用途" />
-      </n-form-item>
+  <n-modal
+    v-model:show="visible"
+    preset="dialog"
+    title="编辑规则"
+    :style="{ width: '750px' }"
+    :mask-closable="false"
+  >
+    <div style="max-height: 60vh; overflow-y: auto; padding-right: 4px;">
+      <n-form :model="form" label-placement="left" label-width="110px" ref="formRef">
+        <n-form-item label="规则 ID" path="id">
+          <n-input v-model:value="form.id" placeholder="如: morning_greeting" :disabled="!!props.rule" />
+        </n-form-item>
+        <n-form-item label="描述" path="description">
+          <n-input v-model:value="form.description" placeholder="描述消息用途" />
+        </n-form-item>
 
-      <n-form-item label="Cron 表达式" path="original_schedule">
-        <n-input v-model:value="form.original_schedule" placeholder="如: 0 8 * * * (每天8点)" />
-        <div style="font-size: 12px; color: #888; margin-top: 4px;">
-          格式: 分 时 日 月 周 (例: 0 8 * * * 每天8点, */15 * * * * 每15分钟)
-        </div>
-      </n-form-item>
+        <n-form-item label="Cron 表达式" path="original_schedule">
+          <n-input v-model:value="form.original_schedule" placeholder="如: 0 8 * * * (每天8点)" />
+          <div style="font-size: 12px; color: #888; margin-top: 2px;">
+            格式: 分 时 日 月 周 (例: 0 8 * * * 每天8点, */15 * * * * 每15分钟)
+          </div>
+        </n-form-item>
 
-      <n-form-item label="推送渠道" path="channels">
-        <n-checkbox-group v-model:value="form.channels">
-          <n-checkbox v-for="ch in channelOptions" :key="ch.value" :value="ch.value">
-            {{ ch.label }}
-          </n-checkbox>
-        </n-checkbox-group>
-      </n-form-item>
+        <n-form-item label="推送渠道" path="channels">
+          <n-checkbox-group v-model:value="form.channels">
+            <n-checkbox v-for="ch in channelOptions" :key="ch.value" :value="ch.value">
+              {{ ch.label }}
+            </n-checkbox>
+          </n-checkbox-group>
+        </n-form-item>
 
-      <n-form-item label="模板数据 (JSON)" path="data">
-        <n-input
-          v-model:value="dataJson"
-          type="textarea"
-          placeholder='如: {"title": "早安", "group": "Daily"}'
-          :rows="2"
-        />
-      </n-form-item>
+        <n-form-item label="模板数据 (JSON)" path="data">
+          <n-input
+            v-model:value="dataJson"
+            type="textarea"
+            placeholder='如: {"title": "早安", "group": "Daily"}'
+            :rows="2"
+          />
+        </n-form-item>
 
-      <n-form-item label="模板内容" path="template">
-        <n-input
-          v-model:value="form.template"
-          type="textarea"
-          placeholder="支持 Jinja2 语法，如: 早上好 {{ date }}"
-          :rows="6"
-        />
-      </n-form-item>
+        <n-form-item label="模板内容" path="template">
+          <n-input
+            v-model:value="form.template"
+            type="textarea"
+            placeholder="支持 Jinja2 语法，如: 早上好 {{ date }}"
+            :rows="5"
+          />
+        </n-form-item>
 
-      <n-form-item label="预览">
-        <n-button size="small" @click="preview">预览渲染结果</n-button>
-        <n-card v-if="previewText" size="small" style="margin-top: 8px; max-height: 150px; overflow: auto;">
-          <pre style="white-space: pre-wrap; margin: 0; font-size: 13px;">{{ previewText }}</pre>
-        </n-card>
-      </n-form-item>
+        <n-form-item label="预览">
+          <n-button size="small" @click="preview">预览渲染结果</n-button>
+          <n-card v-if="previewText" size="small" style="margin-top: 6px; max-height: 100px; overflow: auto;">
+            <pre style="white-space: pre-wrap; margin: 0; font-size: 13px;">{{ previewText }}</pre>
+          </n-card>
+        </n-form-item>
 
-      <n-form-item label="启用" path="enabled">
-        <n-switch v-model:value="form.enabled" />
-      </n-form-item>
-    </n-form>
+        <n-form-item label="启用" path="enabled">
+          <n-switch v-model:value="form.enabled" />
+        </n-form-item>
+      </n-form>
+    </div>
 
     <template #action>
       <n-button @click="visible = false">取消</n-button>
@@ -191,3 +199,42 @@ onMounted(() => {
   }
 })
 </script>
+
+<style scoped>
+/* 覆盖 n-modal 默认内边距，让内容更紧凑 */
+:deep(.n-modal .n-card) {
+  padding: 16px 20px 0 20px;
+}
+:deep(.n-modal .n-card-header) {
+  padding-bottom: 8px;
+}
+:deep(.n-modal .n-card__content) {
+  padding-bottom: 0;
+}
+:deep(.n-modal .n-card__action) {
+  padding: 12px 20px 16px 20px;
+  border-top: 1px solid #f0f0f0;
+}
+/* 减少表单项间距 */
+:deep(.n-form-item) {
+  margin-bottom: 14px;
+}
+:deep(.n-form-item .n-form-item-label) {
+  line-height: 32px;
+}
+/* 内容滚动区域优化 */
+:deep(.n-modal .n-card__content > div) {
+  overflow-y: auto;
+}
+/* 滚动条样式 */
+:deep(.n-modal .n-card__content > div::-webkit-scrollbar) {
+  width: 4px;
+}
+:deep(.n-modal .n-card__content > div::-webkit-scrollbar-thumb) {
+  background: #d0d0d0;
+  border-radius: 2px;
+}
+:deep(.n-modal .n-card__content > div::-webkit-scrollbar-track) {
+  background: transparent;
+}
+</style>
