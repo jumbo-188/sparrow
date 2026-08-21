@@ -283,12 +283,15 @@ const columns = [
   {
     title: '操作',
     key: 'actions',
-    width: 200,
+    width: 280,
     render(row) {
-      return h(NSpace, { size: 8 }, [
-        h(NButton, { size: 'small', type: 'primary', tertiary: true, onClick: () => openEditor(row) }, '编辑'),
-        h(NButton, { size: 'small', type: 'success', tertiary: true, onClick: () => handleTest(row) }, '测试'),
-        h(NButton, { size: 'small', type: 'error', tertiary: true, onClick: () => handleDelete(row) }, '删除')
+      return h('div', { style: 'display: flex; justify-content: space-between; align-items: center; width: 100%;' }, [
+        h(NSpace, { size: 8 }, [
+          h(NButton, { size: 'small', type: 'primary', tertiary: true, onClick: () => openEditor(row) }, '编辑'),
+          h(NButton, { size: 'small', type: 'info', tertiary: true, onClick: () => handleCopy(row) }, '复制'),
+          h(NButton, { size: 'small', type: 'error', tertiary: true, onClick: () => handleDelete(row) }, '删除')
+        ]),
+        h(NButton, { size: 'small', type: 'success', tertiary: true, onClick: () => handleTest(row) }, '测试')
       ])
     }
   }
@@ -303,6 +306,22 @@ const onSaved = () => {
   showEditor.value = false
   store.fetchRules()
   message.success('规则已保存')
+}
+
+// ============ 复制功能 ============
+const handleCopy = (row) => {
+  // 复制除 id 外的所有字段
+  const copyData = {
+    description: row.description || '',
+    original_schedule: row.original_schedule || '',
+    channels: [...(row.channels || [])],
+    data: { ...(row.data || {}) },
+    template: row.template || '',
+    enabled: row.enabled !== undefined ? row.enabled : true
+  }
+  // 传入复制数据，id 为空，表示新建
+  editingRule.value = copyData
+  showEditor.value = true
 }
 
 const handleTest = async (row) => {

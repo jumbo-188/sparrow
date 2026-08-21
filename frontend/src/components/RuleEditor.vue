@@ -9,7 +9,7 @@
     <div style="max-height: 60vh; overflow-y: auto; padding-right: 4px;">
       <n-form :model="form" label-placement="left" label-width="110px" ref="formRef">
         <n-form-item label="规则 ID" path="id">
-          <n-input v-model:value="form.id" placeholder="如: morning_greeting" :disabled="!!props.rule" />
+          <n-input v-model:value="form.id" placeholder="如: morning_greeting" :disabled="!!props.rule?.id" />
         </n-form-item>
         <n-form-item label="描述" path="description">
           <n-input v-model:value="form.description" placeholder="描述消息用途" />
@@ -103,11 +103,14 @@ const form = reactive({
 
 const dataJson = ref('{}')
 
+// ============ 支持编辑和复制模式 ============
 watch(() => props.show, (val) => {
   visible.value = val
   if (val && props.rule) {
+    // 判断是编辑模式（有 id）还是复制模式（无 id）
+    const hasId = !!props.rule.id
     Object.assign(form, {
-      id: props.rule.id,
+      id: hasId ? props.rule.id : '',
       description: props.rule.description || '',
       original_schedule: props.rule.original_schedule || '',
       channels: [...(props.rule.channels || [])],
@@ -180,9 +183,11 @@ const save = async () => {
       enabled: form.enabled
     }
 
-    if (props.rule) {
+    if (props.rule?.id) {
+      // 编辑模式：更新已有规则
       await store.updateRule(props.rule.id, payload)
     } else {
+      // 复制/新建模式：创建新规则
       await store.createRule(payload)
     }
     emit('saved')
