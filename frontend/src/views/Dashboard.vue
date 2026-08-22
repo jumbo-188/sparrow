@@ -52,6 +52,11 @@
         <n-tab-pane name="channels" tab="📡 渠道配置">
           <ChannelConfig />
         </n-tab-pane>
+
+        <!-- 在渠道配置 Tab 后面添加 -->
+        <n-tab-pane name="daily-plan" tab="📅 每日计划汇总">
+          <DailyPlanConfig />
+        </n-tab-pane>
       </n-tabs>
     </n-layout-content>
   </n-layout>
@@ -125,12 +130,14 @@ import {
   NSpin,
   NInput,
   NPagination,
-  useMessage
+  useMessage,
+  useDialog
 } from 'naive-ui'
 import { useRulesStore } from '../stores/rules'
 import { previewDailyPlan } from '../api'
 import RuleEditor from '../components/RuleEditor.vue'
 import ChannelConfig from '../components/ChannelConfig.vue'
+import DailyPlanConfig from '../components/DailyPlanConfig.vue'
 
 const message = useMessage()
 const store = useRulesStore()
@@ -324,22 +331,35 @@ const handleCopy = (row) => {
   showEditor.value = true
 }
 
+const dialog = useDialog()  // ✅ 新增
+
 const handleTest = async (row) => {
   const originalTitle = row.data?.title || 'Sparrow 通知'
-  const testTitle = `🧪 测试 - ${originalTitle}`
-  message.loading('正在发送测试推送...')
-  try {
-    const res = await store.testPush(row.id, {
-      title: testTitle,
-      ...row.data
-    })
-    const results = Object.entries(res.results)
-      .map(([k, v]) => `${k}: ${v.success ? '✅' : '❌'}`)
-      .join(' ')
-    message.success(`测试完成 (${results})`)
-  } catch {
-    message.error('测试失败，请查看后端日志')
-  }
+  const channels = row.channels?.join(', ') || '未知渠道'
+
+  // ✅ 二次确认弹窗
+  dialog.warning({
+    title: '确认测试推送',
+    content: `确定要向「${channels}」发送测试消息吗？\n标题：${originalTitle}`,
+    positiveText: '确认发送',
+    negativeText: '取消',
+    onPositiveClick: async () => {
+      const testTitle = `🧪 测试 - ${originalTitle}`
+      message.loading('正在发送测试推送...')
+      try {
+        const res = await store.testPush(row.id, {
+          title: testTitle,
+          ...row.data
+        })
+        const results = Object.entries(res.results)
+          .map(([k, v]) => `${k}: ${v.success ? '✅' : '❌'}`)
+          .join(' ')
+        message.success(`测试完成 (${results})`)
+      } catch {
+        message.error('测试失败，请查看后端日志')
+      }
+    }
+  })
 }
 
 const handleDelete = async (row) => {

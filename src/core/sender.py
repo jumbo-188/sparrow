@@ -93,10 +93,12 @@ async def _send_bark(channel_conf: ChannelConfig, message: str, data: Dict[str, 
     payload = {
         "title": data.get("title", "Sparrow 通知"),
         "body": message,
+        "markdown": message,
         "group": data.get("group") or channel_conf.default_group or "Sparrow",
         "icon": data.get("icon") or channel_conf.default_icon or "",
         "badge": data.get("badge", 1),
-        "sound": data.get("sound", "minuet.caf"),
+        # "sound": data.get("sound", "minuet.caf"),
+        "sound": data.get("sound", ""),
         "url": data.get("url", ""),
         "level": data.get("level", "active"),
         "automaticallyCopy": data.get("automaticallyCopy", 0),
@@ -123,6 +125,7 @@ async def _send_bark(channel_conf: ChannelConfig, message: str, data: Dict[str, 
                 return True
             else:
                 logger.error(f"❌ Bark 返回错误: {result}")
+                logger.info(f"Bark 失败请求体: {json.dumps(payload, ensure_ascii=False)}")
                 return False
     except Exception as e:
         logger.error(f"❌ Bark 请求异常: {e}")

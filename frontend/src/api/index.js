@@ -45,4 +45,9 @@ export const previewDailyPlan = async (date) => {
   return res.data // 直接返回后端 JSON
 }
 
+// ============ 每日计划汇总 API ============
+export const getDailyPlanConfig = () => api.get('/daily-plan/config')
+export const updateDailyPlanConfig = (data) => api.put('/daily-plan/config', data)
+export const testDailyPlan = () => api.post('/daily-plan/test')
+
 export default api

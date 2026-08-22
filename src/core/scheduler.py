@@ -53,6 +53,28 @@ def init_scheduler():
             )
             logger.info(f"✅ 已注册定时任务: {msg.id} -> {ch_name} | Cron: {cron_expr}")
 
+    # ============ 注册每日计划汇总任务 ============
+    config = load_config_typed()
+    daily_plan_config = config.daily_plan
+
+    if daily_plan_config is None:
+        plan_time = "20:00"
+    else:
+        plan_time = daily_plan_config.time  # 使用属性访问
+
+    hour, minute = plan_time.split(":")
+    cron_expr = f"{minute} {hour} * * *"
+
+    from src.core.planner_sender import send_daily_plan
+    scheduler.add_job(
+        func=send_daily_plan,
+        trigger=CronTrigger.from_crontab(cron_expr),
+        id="daily_plan_summary",
+        replace_existing=True,
+        misfire_grace_time=3600
+    )
+    logger.info(f"✅ 已注册每日计划汇总任务 | 时间: {plan_time}")
+
     if not scheduler.running:
         scheduler.start()
         logger.info("🚀 APScheduler 调度器已启动")

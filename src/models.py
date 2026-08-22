@@ -88,10 +88,17 @@ class MessageRule(BaseModel):
         return self
 
 
+class DailyPlanConfig(BaseModel):
+    """每日计划汇总配置"""
+    time: str = "20:00"                    # 发送时间 (HH:MM)
+    channels: List[str] = ["bark"]         # 目标渠道列表
+
+
 # ============ 完整配置文件 ============
 class SparrowConfig(BaseModel):
     channels: List[ChannelConfig]
     messages: List[MessageRule]
+    daily_plan: Optional[DailyPlanConfig] = None  # 新增
 
 
 # ============ 解决前向引用 ============
